@@ -1,1 +1,207 @@
-# Comp-Sci-Project
+#OTHELLO VS AI
+
+
+
+import tkinter as tk #imports the tkinter library 
+import random #used in ai move selection
+from tkinter import messagebox# used to display pop up messages
+
+
+class Board:
+    def __init__(self, root): #constructor method, runs aotomatically when a baord is created
+        self.root = root #stores the window inside the object so it can be accessed
+        self.root.geometry('607x607+300+70') #sets size of window and where it appears on the screen
+        self.root.resizable(False, False)#disablles resizing and movement of window.
+        self.root.overrideredirect(True) #Removes the title bar and window bar
+        self.root.title('Othello')#sets title to othello    
+        self.buttons = [] #Creates an empty list that will store all the buttons
+        self.blackimage = tk.PhotoImage(file="C:\\Users\\olufe\\OneDrive\\Desktop\\Computer Science\\NEA Project\\Images\\Black_piece.png")#laods images
+        self.whiteimage = tk.PhotoImage(file="C:\\Users\\olufe\\OneDrive\\Desktop\\Computer Science\\NEA Project\\Images\\White_piece.png")
+        self.blankimage = tk.PhotoImage(file="C:\\Users\\olufe\\OneDrive\\Desktop\\Computer Science\\NEA Project\\Images\\Blank_piece.png")
+        testMode = False #toggle state of test mode
+        if testMode == True:
+            self.board = [[-1, -1, -1, -1, -1, -1, -1, -1],
+[-1, -1, -1, -1, -1, -1, -1, -1],
+[-1, -1, -1,  1,  1, -1, -1, -1],#FOR TEST AND DEMONSTRATION PURPOSES ONLY Test for Win Condition Ai running out of moves and Player running out of moves respectively
+[-1, -1, -1,  0,  1, -1, -1, -1],#1 = Player (Black)
+[-1, -1, -1,  0,  1, -1, -1, -1],#-1 = Ai (White)
+[-1, -1, -1, -1, -1, -1, -1, -1],#0 = Blank/Empty
+[-1, -1, -1, -1, -1, -1, -1, -1],
+[-1, -1, -1, -1, -1, -1, -1, -1],]
+
+        else:
+            self.board = [[0 for i in range(8)] for i in range(8)] #creates  empty 8x8 board with buttons assigned a value of 0
+            
+            self.board[3][3] = -1
+            self.board[3][4] = 1
+            self.board[4][3] = 1 # When test mode is off sets Starting state of standard othello board
+            self.board[4][4] = -1
+
+        for row in range(8):
+            rowButtons = [] #list to store all buttons on a row
+            for column in range(8): #for loop that runs through column 0-7
+                button = tk.Button(bg='#183521', command=lambda r=row, c=column: self.buttonClick(r, c))#creates clickable buttons and stores current row and column
+                rowButtons.append(button)#adds button into the current row list 
+                button.grid(row=row, column=column) #places buttons in grid layout
+            self.buttons.append(rowButtons)
+
+        self.current_player = 1 #player colour as black
+        self.game_over = False #Tracks wether the game has ended 
+        self.root.bind('<Escape>', lambda event: self.root.destroy())# Escape key closes the game
+        self.drawBoard()#calls drawboard function
+        
+    def onBoard(self, r, c): #check if position is on the board
+        return 0 <= r < 8 and 0 <= c < 8 
+
+    def scanCapturedPieces(self, r, c, player): #checks valid moves and pieces to flip
+        if self.board[r][c] != 0:  # if the chosen square is not empty
+            return []  # it will returns an empty list because a move cannot be played there
+
+        if player == 1:
+            opponent = -1  # if the player is black, the opponent must be white
+        else:
+            opponent = 1  # if the player is white, the opponent must be black
+
+        directions = [
+            (-1, -1), (-1, 0), (-1, 1),
+            (0, -1),           (0, 1),
+            (1, -1),  (1, 0),  (1, 1)
+        ]  # stores the 8 possible directions to scan horizontal vertical and diagonal
+
+        flips = []  # stores all opponent pieces that should be flipped if the move is valid
+
+        for dr, dc in directions:  # checks one direction at a time
+            rr = r + dr  # starts one step away from the chosen square in the current row direction
+            cc = c + dc  # starts one step away from the chosen square in the current column direction
+            line = []  # stores opponent pieces found in this direction
+
+            while self.onBoard(rr, cc) and self.board[rr][cc] == opponent:
+                line.append((rr, cc))  # adds the coordinates of the opponent piece to the line list
+                rr += dr  # moves one more step in the same row direction
+                cc += dc  # moves one more step in the same column direction
+
+            if line and self.onBoard(rr, cc) and self.board[rr][cc] == player:
+                flips.extend(line)  # only adds the line if it ends with the players own piece
+
+        return flips  # returns all pieces to be flipped, or an empty list if the move is not valid
+
+    def allLegalMoves(self, player):  # finds every valid move for the current player
+        moves = []  # list used to store the coordinates of valid moves
+        for r in range(8):  # checks every row
+            for c in range(8):  # checks every column
+                if self.scanCapturedPieces(r, c, player):
+                    moves.append((r, c))  # if scanCapturedPieces returns a non-empty list the move is valid
+        return moves  # returns the full list of valid moves
+
+    def hasValidMove(self, player):  # checks whether the given player has at least one legal move
+        return len(self.allLegalMoves(player)) > 0  # returns True if there is at least one move available
+
+    def countPieces(self):  # counts how many black and white pieces are currently on the board
+        black = 0  # counter for black pieces
+        white = 0  # counter for white pieces
+        for row in self.board:  # loops through each row
+            for cell in row:  # loops through each square in the row
+                if cell == 1:
+                    black += 1  # adds 1 if the square contains a black piece
+                elif cell == -1:
+                    white += 1  # adds 1 if the square contains a white piece
+        return black, white  # returns both totals together
+
+    def drawBoard(self):  # updates the display so it matches the current board values
+        legal_moves = []  # empty list used for highlighting player moves
+        if not self.game_over and self.current_player == 1:
+            legal_moves = self.allLegalMoves(1)  # only highlights valid moves when it is the player's turn
+
+        for r in range(8):  # loops through each row
+            for c in range(8):  # loops through each column
+                if self.board[r][c] == 1:
+                    self.buttons[r][c].config(image=self.blackimage, bg='#183521', activebackground='#183521')  # shows a black piece
+                elif self.board[r][c] == -1:
+                    self.buttons[r][c].config(image=self.whiteimage, bg='#183521', activebackground='#183521')  # shows a white piece
+                else:
+                    if (r, c) in legal_moves:
+                        self.buttons[r][c].config(image=self.blankimage, bg='#FFFFFF', activebackground='#FFFFFF')  # highlights legal player moves
+                    else:
+                        self.buttons[r][c].config(image=self.blankimage, bg='#183521', activebackground='#183521')  # displays an unselectable square
+
+    def finishGame(self):  # ends the game and displays the result
+        self.game_over = True  # changes the flag so no more moves can be made
+        black, white = self.countPieces()  # counts the final scores
+
+        if black > white:
+            winner = 'You win!'  # player wins if black has more pieces
+        elif white > black:
+            winner = 'ai wins!'  # ai wins if white has more pieces
+        else:
+            winner = 'It is a draw!'  # result is a draw if both scores are equal
+
+        messagebox.showinfo('Game Over', f'{winner}\n\nBlack: {black}\nWhite: {white}')  # displays the winner and final piece totals
+
+    def playerMove(self, r, c, player):  # attempts to apply a move for the player
+        flips = self.scanCapturedPieces(r, c, player)  # checks whether the move is legal and gets the captured pieces
+        if not flips:
+            return False  # returns False if the move is not valid
+
+        self.board[r][c] = player  # places the current players piece on the selected square
+        for rr, cc in flips:
+            self.board[rr][cc] = player  # flips each captured piece to the current players colour
+        return True  # returns True to show the move was successful
+
+    def aiMove(self):  # controls the ai turn
+        if self.game_over:
+            return  # stops immediately if the game has already ended
+
+        moves = self.allLegalMoves(-1)  # gets all legal moves for the ai
+
+        if not moves:
+            if self.hasValidMove(1):
+                self.current_player = 1  # gives the turn back to the player if the ai has no move
+                self.drawBoard()  # redraws the board to show the players possible moves
+                messagebox.showinfo('No valid mocves', 'Ai has no valid moves. Players turn.')  # informs the user that the ai has run out of moves
+            else:
+                self.finishGame()  # ends the game if neither side can move
+            return
+
+        move = random.choice(moves)  # randomly selects one move from the ais legal moves
+        self.playerMove(move[0], move[1], -1)  # applies the ai move
+
+        if self.hasValidMove(1):
+            self.current_player = 1  # changes turn back to the player
+            self.drawBoard()  # redraws the board
+        elif self.hasValidMove(-1):
+            self.current_player = -1  # keeps the turn with the ai if the player has no move
+            self.drawBoard()  # updates the board first
+            messagebox.showinfo('No valid moves.', 'You have no valid moves. AIs turn.')  # tells the player they have run out of moves
+            self.root.after(2000, self.aiMove)  # waits 2 seconds then lets the ai move again to simulate thinking 
+        else:
+            self.drawBoard()  # updates the board before finishing
+            self.finishGame()  # ends the game if neither player has a valid move
+
+    def buttonClick(self, r, c):  # handles what happens when the player clicks on a square
+        print('You clicked', r, c)  # prints the clicked coordinates in shell for testing and debugging
+
+        if self.game_over:
+            return  # ignores the click if the game has finished
+
+        if self.current_player != 1:
+            return  # ignores the click if it is not the players turn
+
+        if not self.playerMove(r, c, 1):
+            return  # ignores the click if the chosen move is invalid
+
+        if self.hasValidMove(-1):
+            self.current_player = -1  # changes the turn to the ai
+            self.drawBoard()  # redraws the board after the players move
+            self.root.after(2000, self.aiMove)  # schedules the ai move 2 secs after the board updates to simulate ai thinking
+        elif self.hasValidMove(1):
+            self.current_player = 1  # keeps it as players if the ai has no move
+            self.drawBoard()  # redraws the board
+            messagebox.showinfo('No valid moves', 'AI has no valid moves. Players turn.')  # tells the player the ai has run out of moves
+        else:
+            self.drawBoard()  # redraws the final state
+            self.finishGame()  # ends the game if no one can move
+
+root = tk.Tk()  # creates the main tkinter window
+board = Board(root)  # creates an instance of the Board class
+root.mainloop()  # starts the event loop so the window stays open and responds to user input
+
